@@ -3,14 +3,14 @@
 	.data
 buf:		.space	2	# space in mem so main contents of .bmp file are word-aligned
 buffer:		.space	2000	# reserve space to store contents of .bmp file
-fin:		.asciiz	"test_8x8_16-color_w.bmp"
+fin:		.asciiz	"test_8x8_16-color_lightgrey.bmp"
 fout:		.asciiz "testout.bmp"
 br:		.asciiz "\n"
 
 	.text
 main:
 	jal	read_bmp	# read bitmap image, get width and height
-	jal	print_pixel_data
+	#jal	print_pixel_data
 	j	exit
 
 ## VALUES USED ##
