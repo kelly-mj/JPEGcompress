@@ -1,25 +1,23 @@
 #   read_bmp.asm
 
 	.data
-err:		.asciiz	"Error; program exiting.\n"
-fin:		.asciiz	"test_8x8_checkered.bmp"
+buf:		.space	2	# space in mem so main contents of .bmp file are word-aligned
+buffer:		.space	2000	# reserve space to store contents of .bmp file
+fin:		.asciiz	"test_8x8_16-color_w.bmp"
 fout:		.asciiz "testout.bmp"
 br:		.asciiz "\n"
-buffer:		.space	2000	# reserve space to read from file
-header:		.space	14	# file header - signature, filesize, reserved, dataOffset
-infoHeader: 	.space	40	# bitmap info header
-width:		.space	4	# horizontal width of image
-height:		.space	4	# vertical height of image
 
 	.text
 main:
 	jal	read_bmp	# read bitmap image, get width and height
+	jal	print_pixel_data
 	j	exit
 
 ## VALUES USED ##
-# $s0	file descriptor of original .bmp file
+# $s0	address of the start of the actual image data (pixel data)
 # $s1	bitmap image horizontal width
 # $s2	bitmap image vertical height
+# $s3	bits per pixel - "1" indicates monochrome image
 
 read_bmp:
 	### open original bmp file ###
@@ -28,47 +26,48 @@ read_bmp:
 	li	$a1, 0		# read-only
 	li	$a2, 0		# ignore mode
 	syscall
-	move $s2, $v0		# save file descriptor
+	move	$t0, $v0	# save file descriptor
 	
 	### read from file ###
-	li	$v0, 14	# for file read
-	la	$a0, ($s2)	# file descriptor
+	li	$v0, 14		# for file read
+	la	$a0, ($t0)	# file descriptor
 	la	$a1, buffer	# address of input buffer (puts data in buffer)
 	li	$a2, 2000	# max num char to read
 	syscall
 
 	### close file ###
 	li	$v0, 16		# for file close
-	la	$a0, ($s2)	# load file descriptor
+	la	$a0, ($t0)	# load file descriptor
 	syscall
 	
 	### extract header info ###
 	la	$t0, buffer	# get address of .bmp file data we just read
 	la	$t1, 14($t0)	# get address of info header (starts 14 bytes into the .bmp file data)
+	la	$s0, 44($t1)	# address of start of pixel data
 	lw	$s1, 4($t1)	# store width  (4 bytes into the info header)
 	lw	$s2, 8($t1)	# store height (8 bytes into the info header)
-	lh	$s3, 12($t1)	# store bits per pixel
-	
+	lh	$s3, 14($t1)	# store bits per pixel
 	
 	jr $ra			# return to main program
 
-exit_err:
-	li	$v0, 4
-	la	$a0, err
+print_pixel_data:
+	subi	$t0, $s0, 4
+	j	ppd_loop
+	
+ppd_loop:
+	addi	$t0, $t0, 4
+	lw	$t1, ($t0)
+	la	$a0, ($t1)
+	li	$v0, 34
 	syscall
-	j	exit
+	j	ppd_loop
 
 exit:
-	li $v0, 10
+	li	$v0, 10
 	syscall
 
 printBreak:
-	li $v0, 4
-	la $a0, br
+	li	$v0, 4
+	la	$a0, br
 	syscall
-	jr $ra
-
-checkErr:
-	addi	$t0, $v0, 1
-	beqz	$t0, exit_err
 	jr $ra
