@@ -13,7 +13,7 @@ height:		.space	4	# vertical height of image
 
 	.text
 main:
-	jal	read_bmp
+	jal	read_bmp	# read bitmap image, get width and height
 	j	exit
 
 ## VALUES USED ##
@@ -29,12 +29,12 @@ read_bmp:
 	li	$a2, 0		# ignore mode
 	syscall
 	move $s2, $v0		# save file descriptor
-
+	
 	### read from file ###
-	li $v0, 14		# for file read
-	la $a0, ($s2)		# file descriptor
-	la $a1, buffer		# address of input buffer
-	li $a2, 2000		# max num char to read
+	li	$v0, 14	# for file read
+	la	$a0, ($s2)	# file descriptor
+	la	$a1, buffer	# address of input buffer (puts data in buffer)
+	li	$a2, 2000	# max num char to read
 	syscall
 
 	### close file ###
@@ -43,20 +43,14 @@ read_bmp:
 	syscall
 	
 	### extract header info ###
-	la $t0, buffer		# get address of .bmp file data we just read
-	la $t1, 14($t0)		# get address of info header (starts 14 bytes into the .bmp file data)
-	lw $s1, 4($t1)		# get width  (4 bytes into the info header)
-	lw $s2, 8($t1)		# get height (8 bytes into the info header)
+	la	$t0, buffer	# get address of .bmp file data we just read
+	la	$t1, 14($t0)	# get address of info header (starts 14 bytes into the .bmp file data)
+	lw	$s1, 4($t1)	# store width  (4 bytes into the info header)
+	lw	$s2, 8($t1)	# store height (8 bytes into the info header)
+	lh	$s3, 12($t1)	# store bits per pixel
 	
-	la $a0, ($s1)
-	li $v0, 1
-	syscall
 	
-	la $a0, ($s2)
-	li $v0, 1
-	syscall
-	
-	jr $ra
+	jr $ra			# return to main program
 
 exit_err:
 	li	$v0, 4
