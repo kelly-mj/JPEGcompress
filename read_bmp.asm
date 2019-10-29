@@ -2,7 +2,7 @@
 
 	.data
 err:		.asciiz	"Error; program exiting.\n"
-fin:		.asciiz	"test.bmp"
+fin:		.asciiz	"test_8x8_checkered.bmp"
 fout:		.asciiz "testout.bmp"
 br:		.asciiz "\n"
 buffer:		.space	2000	# reserve space to read from file
@@ -17,7 +17,9 @@ main:
 	j	exit
 
 ## VALUES USED ##
-# $s2	file descriptor of original .bmp file
+# $s0	file descriptor of original .bmp file
+# $s1	bitmap image horizontal width
+# $s2	bitmap image vertical height
 
 read_bmp:
 	### open original bmp file ###
@@ -41,8 +43,17 @@ read_bmp:
 	syscall
 	
 	### extract header info ###
-	li $v0, 4
-	la $a0, buffer
+	la $t0, buffer		# get address of .bmp file data we just read
+	la $t1, 14($t0)		# get address of info header (starts 14 bytes into the .bmp file data)
+	lw $s1, 4($t1)		# get width  (4 bytes into the info header)
+	lw $s2, 8($t1)		# get height (8 bytes into the info header)
+	
+	la $a0, ($s1)
+	li $v0, 1
+	syscall
+	
+	la $a0, ($s2)
+	li $v0, 1
 	syscall
 	
 	jr $ra
