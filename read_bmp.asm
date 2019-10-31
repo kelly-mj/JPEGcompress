@@ -94,37 +94,80 @@ ccs_pixel:
 	#srl	$t2, $t2, 8
 	#andi	$t3, $a0, 61440
 	#srl	$t3, $t3, 12
-	lw	$ra, 4($sp)	# return stack to original state
+	lw	$ra, 4($sp)		# return stack to original state
 	addi	$sp, $sp, 4
 	jr	$ra
 
 # ARGUMENTS: $a0 = data from entry in color table
 # RETURNS:   none
-# ALTERS:    $s5, $s6, $s7
 transform_rgb_ybr:
-	addi	$sp, $sp, -4		# free up $s5
-	sw	$s5, 4($sp)
-	
-	### $t0 = R component
-	and	$s5, $a0, 255		# mask G,B components in color value (get 0x------xx portion)
-	### $t1 = G component
-	and	$s6, $a0, 65280		# mask R,B components in color value (get 0x----xx-- portion)
-	srl	$s6, $s6, 8		# shift right so significant bits are in the lowest-order position
-	### $t2 = B component
-	srl	$s7, $a0, 16		# shift right so significant bits for B component are in the lowest-order position
+	addi	$sp, $sp, -4		# make space on the stack so we can call subroutines
+	sw	$ra, 4($sp)
+	### Get RGB components and store as FP values ###
+	and	$t0, $a0, 255		# R: mask G,B components in color value (get 0x------xx portion)
+	and	$t1, $a0, 65280		# G: mask R,B components in color value (get 0x----xx-- portion)
+	srl	$t1, $t1, 8		#    shift right so significant bits are in the lowest-order position
+	srl	$t2, $a0, 16		# B: shift right so significant bits for B component are in the lowest-order position
+	mtc1	$t0, $f0		# convert R to fp
+	cvt.s.w	$f0, $f0
+	mtc1	$t1, $f2		# convert G to fp
+	cvt.s.w	$f2, $f2
+	mtc1	$t2, $f4		# convert B to fp
+	cvt.s.w	$f4, $f4
 	
 	### Y  = 16  + 0.256788*R + 0.504129*G + 0.097905*B ###
-	addi	$a0, $zero, 256788	# R coefficient
-	addi	$a1, $zero, 504129	# G coefficient
-	addi	$a2, $zero,  97905	# B coefficient
+	addi	$a0, $zero, 256788	# R coefficient, *10^6
+	addi	$a1, $zero, 504129	# G coefficient, *10^6
+	addi	$a2, $zero,  97905	# B coefficient, *10^6
+	addi	$a3, $zero,     16	# Constant to add
+	jal	rgb_ybr_equ
 	#add	$a3, 
 	### Cb = 128 - 0.148454*R + 0.290760*G + 0.439216*B ###
 	### Cr = 128 + 0.439216*R + 0.368063*G + 0.071152*B ###
 	
-	lw	$s5, 4($sp)		# restore $s5
-	addi	$sp,  $sp, 4
+	lw	$ra, 4($sp)		# return stack to original state
+	addi	$sp, $sp, 4
 	jr $ra				# return to caller
+
+# ARGUMENTS: $a0=R_coeff, $a1=G_coeff, $a2=B_coeff, $a3=constant, $f0=R_value, $f2=G_value, $f4=B_value
+# RETURNS  : ?? don't know yet
+rgb_ybr_equ:
+	addi	$sp, $sp, -4		# make space on the stack so we can call subroutines
+	sw	$ra, 4($sp)
 	
+	addi	$t0, $zero, 1000000	# store number to adjust coefficient
+	mtc1	$t0, $f28
+	cvt.s.w	$f28, $f28
+	
+	mtc1	$a3, $f12		# store constant to add
+	cvt.s.w	$f12, $f12
+	
+	### Convert coefficients to decimal values ###
+	mtc1	$a0, $f6		# convert R coeff to fp
+	cvt.s.w	$f6, $f6		#     convert from word
+	div.s	$f6, $f6, $f28		#     divide by 10^6
+	mtc1	$a1, $f8		# convert G coeff to fp
+	cvt.s.w	$f8, $f8		#     convert from word
+	div.s	$f8, $f8, $f28		#     divide by 10^6
+	mtc1	$a2, $f10		# convert B coeff to fp
+	cvt.s.w	$f10, $f10		#     convert from word
+	div.s	$f10, $f10, $f28	#     divide by 10^6
+	
+	### Multiply by R, G, B values, add results ###
+	mul.s	$f6, $f6, $f0		# R' = R_coeff*R
+	mul.s	$f8, $f8, $f2		# G' = G_coeff*G
+	mul.s	$f10, $f10, $f4		# B' = B_coeff*B
+	add.s	$f6, $f6, $f8		# =  R' + G'
+	add.s	$f6, $f6, $f10		# = (R' + G') + B'
+	add.s	$f6, $f6, $f12		# = (R' + B' + G') + constant
+	
+	### Return value ###
+	
+	
+	lw	$ra, 4($sp)		# restore stack
+	addi	$sp, $sp, 4
+	jr	$ra			# return to caller
+			
 print_pixel_data:
 	subi	$t0, $s0, 4
 	j	ppd_loop
