@@ -106,6 +106,14 @@ ccs_pixel:
 # ARGUMENTS: $a0 = data from entry in color table
 # RETURNS:   none
 transform_rgb_ybr:
+	and $t0, $a0, 255	# get R component
+	and $t1, $a0, 65280	# get G component
+	srl $t1, $t1, 8
+	srl $a0, $a0, 8		# get B component
+	and $t2, $a0, 255
+	### calculate Y  =  0.299R + 0.587G + 0.114B ###
+	### calculate Cb = -0.169R - 0.331G + 0.500B ###
+	### claulcate Cr =  0.500R - 0.419G - 0.081B ###
 	jr $ra
 	
 print_pixel_data:
