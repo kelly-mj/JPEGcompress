@@ -100,15 +100,18 @@ ccs_pixel:
 
 # ARGUMENTS: $a0 = data from entry in color table
 # RETURNS:   none
+# ALTERS:    $s5, $s6, $s7
 transform_rgb_ybr:
+	addi	$sp, $sp, -4		# free up $s5
+	sw	$s5, 4($sp)
+	
 	### $t0 = R component
-	and	$t0, $a0, 255		# mask G,B components in color value (get 0x------xx portion)
+	and	$s5, $a0, 255		# mask G,B components in color value (get 0x------xx portion)
 	### $t1 = G component
-	and	$t1, $a0, 65280		# mask R,B components in color value (get 0x----xx-- portion)
-	srl	$t1, $t1, 8		# shift right so significant bits are in the lowest-order position
+	and	$s6, $a0, 65280		# mask R,B components in color value (get 0x----xx-- portion)
+	srl	$s6, $s6, 8		# shift right so significant bits are in the lowest-order position
 	### $t2 = B component
-	srl	$t2, $a0, 16		# shift right so significant bits for B component are in the lowest-order position
-	#and	$t2, $a0, 255		# mask R,G components in color value (get 0x------xx portion) <- unnecessary if leading value is zero
+	srl	$s7, $a0, 16		# shift right so significant bits for B component are in the lowest-order position
 	
 	### Y  = 16  + 0.256788*R + 0.504129*G + 0.097905*B ###
 	addi	$a0, $zero, 256788	# R coefficient
@@ -117,7 +120,10 @@ transform_rgb_ybr:
 	#add	$a3, 
 	### Cb = 128 - 0.148454*R + 0.290760*G + 0.439216*B ###
 	### Cr = 128 + 0.439216*R + 0.368063*G + 0.071152*B ###
-	jr $ra
+	
+	lw	$s5, 4($sp)		# restore $s5
+	addi	$sp,  $sp, 4
+	jr $ra				# return to caller
 	
 print_pixel_data:
 	subi	$t0, $s0, 4
