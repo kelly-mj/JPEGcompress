@@ -106,25 +106,17 @@ ccs_pixel:
 # ARGUMENTS: $a0 = data from entry in color table
 # RETURNS:   none
 transform_rgb_ybr:
-	and $t0, $a0, 255	# get R component
-	and $t1, $a0, 65280	# get G component
-	srl $t1, $t1, 8
-	srl $a0, $a0, 8		# get B component
-	and $t2, $a0, 255
-		# calculate E_R = R/255
-		# calculate E_G = G/255
-		# calculate E_B = B/255
-	### calculate E_Y  =  0.299E_R + 0.587E_G + 0.114E_B ###
-	### calculate E_Cb = -0.169E_R - 0.331E_G + 0.500E_B ###
-	### calulcate E_Cr =  0.500E_R - 0.419E_G - 0.081E_B ###
-		# calculate Y  = 219*E_Y  + 16
-		# calculate Cb = 224*E_Cb + 128
-		# calculate Cr = 224*E_Cr + 128
-	### Y  = 16  +  65.481E_R + 128.553E_G +  24.966E_B ###
-	### Cb = 128 -  37.856E_R +  74.144E_G + 112.000E_B ###
-	### Cr = 128 + 112.000E_R +  93.856E_G +  18.144E_B ###
+	### $t0 = R component
+	and $t0, $a0, 255		# mask G,B components in color value (get 0x------xx portion)
+	### $t1 = G component
+	and $t1, $a0, 65280		# mask G,B components in color value (get 0x----xx-- portion)
+	srl $t1, $t1, 8			# shift right so significant bits are in the lowest-order position
+	### $t2 = B component
+	srl $a0, $a0, 8			# mask G,B components in color value (get 0x--xx---- portion)
+	and $t2, $a0, 255		# shift right so significant bits are in the lowest-order position
 	
 	### Y  = 16  + 0.256788*R + 0.504129*G + 0.097905*B ###
+	
 	### Cb = 128 - 0.148454*R + 0.290760*G + 0.439216*B ###
 	### Cr = 128 + 0.439216*R + 0.368063*G + 0.071152*B ###
 	jr $ra
