@@ -121,9 +121,21 @@ transform_rgb_ybr:
 	addi	$a2, $zero,  97905	# B coefficient, *10^6
 	addi	$a3, $zero,     16	# Constant to add
 	jal	rgb_ybr_equ
-	#add	$a3, 
-	### Cb = 128 - 0.148454*R + 0.290760*G + 0.439216*B ###
-	### Cr = 128 + 0.439216*R + 0.368063*G + 0.071152*B ###
+	add	$s7, $zero, $v0
+	### Cb = 128 - 0.148454*R - 0.290760*G + 0.439216*B ###
+	addi	$a0, $zero, -148454	# R coefficient, *10^6
+	addi	$a1, $zero, -290760	# G coefficient, *10^6
+	addi	$a2, $zero, 439216	# B coefficient, *10^6
+	addi	$a3, $zero,    128	# Constant to add
+	jal	rgb_ybr_equ
+	add	$t8, $zero, $v0
+	### Cr = 128 + 0.439216*R - 0.368063*G - 0.071152*B ###
+	addi	$a0, $zero, 439216	# R coefficient, *10^6
+	addi	$a1, $zero, -368063	# G coefficient, *10^6
+	addi	$a2, $zero, -71152	# B coefficient, *10^6
+	addi	$a3, $zero,    128	# Constant to add
+	jal	rgb_ybr_equ
+	add	$t9, $zero, $v0
 	
 	lw	$ra, 4($sp)		# return stack to original state
 	addi	$sp, $sp, 4
