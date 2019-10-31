@@ -9,7 +9,7 @@ br:		.asciiz "\n"
 
 	.text
 main:
-	jal	read_bmp	# read bitmap image, get width and height
+	jal	read_bmp		# read bitmap image, get width and height
 	#jal	print_pixel_data
 	j	exit
 
@@ -17,7 +17,7 @@ main:
 # $s0	address of the start of the actual image data (pixel data)
 # $s1	bitmap image horizontal width
 # $s2	bitmap image vertical height
-# $s3	bits per pixel - "1" indicates monochrome image
+# $s3	bits per pixel - "1" indicates monochrome image <-- MIGHT JUST WANT TO ASSUME 16-BIT
 
 read_bmp:
 	### open original bmp file ###
@@ -43,7 +43,8 @@ read_bmp:
 	### extract header info ###
 	la	$t0, buffer	# get address of .bmp file data we just read
 	la	$t1, 14($t0)	# get address of info header (starts 14 bytes into the .bmp file data)
-	la	$s0, 44($t1)	# address of start of pixel data
+	la	$s0, 100($t1)	# address of start of pixel data
+	addi	$s0, $s0, 4	# address of start of pixel data - corrected
 	lw	$s1, 4($t1)	# store width  (4 bytes into the info header)
 	lw	$s2, 8($t1)	# store height (8 bytes into the info header)
 	lh	$s3, 14($t1)	# store bits per pixel
