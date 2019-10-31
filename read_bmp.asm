@@ -79,17 +79,35 @@ convert_color_space:
 	addi	$sp, $sp, 4
 	jr $ra
 
+# ARGUMENTS: $a0 = half-word of pixel data
+# RETURNS:   none
 ccs_pixel:
-	andi	$t0, $a0, 15
-	andi	$t1, $a0, 240
-	srl	$t1, $t1, 4
-	andi	$t2, $a0, 3840
-	srl	$t2, $t2, 8
-	andi	$t3, $a0, 61440
-	srl	$t3, $t3, 12
-	jr	$ra
+	addi	$sp, $sp, -4		# make space on the stack so we can call subroutines
+	sw	$ra, 4($sp)
+	add	$t4, $zero, $a0		# store data to free up $a0
+	addi	$t5, $s0, -64		# store start of color table
 	
+	### read value at each pixel in the half-word ###
+	andi	$t0, $t4, 15		# extract rightmost pixel data (0x-------x)
+	sll	$t0, $t0, 2		# multiply that value by 4
+	add	$a0, $t5, $t0		# add to pointer to start of color table. Now points to corresponding value in the color table for our pixel.
+	lw	$a0, ($a0)		# load data from the color table
+	jal	transform_rgb_ybr	# call transform
+	#andi	$t1, $a0, 240
+	#srl	$t1, $t1, 4
+	#andi	$t2, $a0, 3840
+	#srl	$t2, $t2, 8
+	#andi	$t3, $a0, 61440
+	#srl	$t3, $t3, 12
+	lw	$ra, 4($sp)	# return stack to original state
+	addi	$sp, $sp, 4
+	jr	$ra
 
+# ARGUMENTS: $a0 = data from entry in color table
+# RETURNS:   none
+transform_rgb_ybr:
+	jr $ra
+	
 print_pixel_data:
 	subi	$t0, $s0, 4
 	j	ppd_loop
