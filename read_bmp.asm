@@ -111,9 +111,16 @@ transform_rgb_ybr:
 	srl $t1, $t1, 8
 	srl $a0, $a0, 8		# get B component
 	and $t2, $a0, 255
-	### calculate Y  =  0.299R + 0.587G + 0.114B ###
-	### calculate Cb = -0.169R - 0.331G + 0.500B ###
-	### claulcate Cr =  0.500R - 0.419G - 0.081B ###
+		# calculate E_R = R/255
+		# calculate E_G = G/255
+		# calculate E_B = B/255
+	### calculate E_Y  =  0.299E_R + 0.587E_G + 0.114E_B ###
+	### calculate E_Cb = -0.169E_R - 0.331E_G + 0.500E_B ###
+	### calulcate E_Cr =  0.500E_R - 0.419E_G - 0.081E_B ###
+		# calculate Y  = 219*E_Y  + 16
+		# calculate Cb = 224*E_Cb + 128
+		# calculate Cr = 224*E_Cr + 128
+	
 	jr $ra
 	
 print_pixel_data:
