@@ -130,7 +130,7 @@ transform_rgb_ybr:
 	jr $ra				# return to caller
 
 # ARGUMENTS: $a0=R_coeff, $a1=G_coeff, $a2=B_coeff, $a3=constant, $f0=R_value, $f2=G_value, $f4=B_value
-# RETURNS  : ?? don't know yet
+# RETURNS  : $v0 = equation result rounded to the nearest integer
 rgb_ybr_equ:
 	addi	$sp, $sp, -4		# make space on the stack so we can call subroutines
 	sw	$ra, 4($sp)
@@ -138,6 +138,13 @@ rgb_ybr_equ:
 	addi	$t0, $zero, 1000000	# store number to adjust coefficient
 	mtc1	$t0, $f28
 	cvt.s.w	$f28, $f28
+	addi	$t0, $zero, 10		# store 0.5 in $f26 to aid in rounding
+	mtc1	$t0, $f26
+	cvt.s.w	$f26, $f26
+	addi	$t0, $zero, 5
+	mtc1	$t0, $f24
+	cvt.s.w	$f24, $f24
+	div.s	$f26, $f24, $f26
 	
 	mtc1	$a3, $f12		# store constant to add
 	cvt.s.w	$f12, $f12
@@ -161,8 +168,10 @@ rgb_ybr_equ:
 	add.s	$f6, $f6, $f10		# = (R' + G') + B'
 	add.s	$f6, $f6, $f12		# = (R' + B' + G') + constant
 	
-	### Return value ###
-	
+	### Round to nearest int and return value ###
+	add.s	$f6, $f6, $f26
+	cvt.w.s	$f6, $f6
+	mfc1	$v0, $f6
 	
 	lw	$ra, 4($sp)		# restore stack
 	addi	$sp, $sp, 4
