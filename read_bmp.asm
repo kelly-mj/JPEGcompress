@@ -56,16 +56,9 @@ read_bmp:
 	lw	$s2, 8($t1)	# store height (8 bytes into the info header)
 	lh	$s3, 14($t1)	# store bits per pixel
 	
-	### testing jump ###
-	#addi $sp, $sp, -4
-	#sw $ra, 4($sp)
-	#jal test
-	#lw $ra, 4($sp)
-	#addi $sp, $sp, 4
-	
 	jr $ra			# return to main program
 
-# ARGUMENTS: 
+# ARGUMENTS: none
 # RETURNS:   none
 convert_color_space:
 	addi	$sp, $sp, -4	# make space on the stack so we can call subroutines
@@ -73,6 +66,7 @@ convert_color_space:
 	
 	lhu	$a0, ($s0)	# loads 0x----xxxx data from word
 	jal	ccs_pixel
+	
 	#lhu	$t1, 2($s0)	# loads 0xxxxx---- data from word
 	
 	lw	$ra, 4($sp)	# return stack to original state
@@ -81,16 +75,17 @@ convert_color_space:
 
 # ARGUMENTS: $a0 = half-word of pixel data
 # RETURNS:   none
+# ALTERS:    $s4, $s5
 ccs_pixel:
 	addi	$sp, $sp, -4		# make space on the stack so we can call subroutines
 	sw	$ra, 4($sp)
-	add	$t4, $zero, $a0		# store data to free up $a0
-	addi	$t5, $s0, -64		# store start of color table
+	add	$s4, $zero, $a0		# pixel data in $s4 to free up $a0
+	addi	$s5, $s0, -64		# store start of color table in $s5
 	
 	### read value at each pixel in the half-word ###
-	andi	$t0, $t4, 15		# extract rightmost pixel data (0x-------x)
+	andi	$t0, $s4, 15		# extract rightmost pixel data (0x-------x)
 	sll	$t0, $t0, 2		# multiply that value by 4
-	add	$a0, $t5, $t0		# add to pointer to start of color table. Now points to corresponding value in the color table for our pixel.
+	add	$a0, $s5, $t0		# add to pointer to start of color table. Now points to corresponding value in the color table for our pixel.
 	lw	$a0, ($a0)		# load data from the color table
 	jal	transform_rgb_ybr	# call transform
 	#andi	$t1, $a0, 240
@@ -107,16 +102,19 @@ ccs_pixel:
 # RETURNS:   none
 transform_rgb_ybr:
 	### $t0 = R component
-	and $t0, $a0, 255		# mask G,B components in color value (get 0x------xx portion)
+	and	$t0, $a0, 255		# mask G,B components in color value (get 0x------xx portion)
 	### $t1 = G component
-	and $t1, $a0, 65280		# mask G,B components in color value (get 0x----xx-- portion)
-	srl $t1, $t1, 8			# shift right so significant bits are in the lowest-order position
+	and	$t1, $a0, 65280		# mask R,B components in color value (get 0x----xx-- portion)
+	srl	$t1, $t1, 8		# shift right so significant bits are in the lowest-order position
 	### $t2 = B component
-	srl $a0, $a0, 8			# mask G,B components in color value (get 0x--xx---- portion)
-	and $t2, $a0, 255		# shift right so significant bits are in the lowest-order position
+	srl	$t2, $a0, 16		# shift right so significant bits for B component are in the lowest-order position
+	#and	$t2, $a0, 255		# mask R,G components in color value (get 0x------xx portion) <- unnecessary if leading value is zero
 	
 	### Y  = 16  + 0.256788*R + 0.504129*G + 0.097905*B ###
-	
+	addi	$a0, $zero, 256788	# R coefficient
+	addi	$a1, $zero, 504129	# G coefficient
+	addi	$a2, $zero,  97905	# B coefficient
+	#add	$a3, 
 	### Cb = 128 - 0.148454*R + 0.290760*G + 0.439216*B ###
 	### Cr = 128 + 0.439216*R + 0.368063*G + 0.071152*B ###
 	jr $ra
