@@ -3,7 +3,10 @@
 	.data
 buf:		.space	2	# space in mem so main contents of .bmp file are word-aligned
 buffer:		.space	2000	# reserve space to store contents of .bmp file
-ybr:		.space	2000	# reserve space to store YCbCr color space data
+buf2:		.space	2
+y_table:	.space	64	# reserve space to store YCbCr color space data
+u_table:	.space	64
+v_table:	.space	64
 fin:		.asciiz	"test_8x8_16-color_wb.bmp"
 fout:		.asciiz "testout.bmp"
 br:		.asciiz "\n"
@@ -60,46 +63,56 @@ read_bmp:
 
 # ARGUMENTS: none
 # RETURNS:   none
+# USES:      $s4, $s5, $s6
 convert_color_space:
-	addi	$sp, $sp, -4	# make space on the stack so we can call subroutines
+	addi	$sp, $sp, -12		# make space on the stack so we can call subroutines
 	sw	$ra, 4($sp)
-	
-	lhu	$a0, ($s0)	# loads 0x----xxxx data from word
-	jal	ccs_pixel
-	
-	#lhu	$t1, 2($s0)	# loads 0xxxxx---- data from word
-	
-	lw	$ra, 4($sp)	# return stack to original state
-	addi	$sp, $sp, 4
-	jr $ra
+	sw	$s4, 8($sp)
+	sw	$s5, 12($sp)
 
-# ARGUMENTS: $a0 = half-word of pixel data
-# RETURNS:   none
-# ALTERS:    $s4, $s5
-ccs_pixel:
-	addi	$sp, $sp, -4		# make space on the stack so we can call subroutines
-	sw	$ra, 4($sp)
-	add	$s4, $zero, $a0		# pixel data in $s4 to free up $a0
-	addi	$s5, $s0, -64		# store start of color table in $s5
+	addi	$s4, $s0, -64		# store start of color table in $s4
+	addi	$s5, $s5, 0		# offset
 	
-	### read value at each pixel in the half-word ###
-	andi	$t0, $s4, 15		# extract rightmost pixel data (0x-------x)
-	sll	$t0, $t0, 2		# multiply that value by 4
-	add	$a0, $s5, $t0		# add to pointer to start of color table. Now points to corresponding value in the color table for our pixel.
-	lw	$a0, ($a0)		# load data from the color table
-	jal	transform_rgb_ybr	# call transform
-	#andi	$t1, $a0, 240
-	#srl	$t1, $t1, 4
-	#andi	$t2, $a0, 3840
-	#srl	$t2, $t2, 8
-	#andi	$t3, $a0, 61440
-	#srl	$t3, $t3, 12
-	lw	$ra, 4($sp)		# return stack to original state
-	addi	$sp, $sp, 4
+	### loop through each entry in color table and convert RGB -> YCbCr (YUV) ###
+	jal	convert_color_space_loop
+
+	lw	$s5, 12($sp)		# return stack to original state
+	lw	$s6, 8($sp)
+	lw	$ra, 4($sp)
+	addi	$sp, $sp, 8
 	jr	$ra
 
-# ARGUMENTS: $a0 = data from entry in color table
+# ARGUMENTS: $s4 = address of next entry in color table, $s5 = offset
 # RETURNS:   none
+convert_color_space_loop:
+	addi	$sp, $sp, -4		# make space on the stack
+	sw	$ra, 4($sp)
+	
+	### convert RBG to YCbCr; store converted values in memory ###
+	add	$a0, $zero, $s4
+	lw	$a0, ($a0)
+	jal	transform_rgb_ybr
+	la	$t0, y_table		# store returned y value
+	add	$t0, $t0, $s5
+	sw	$v0, ($t0)
+	la	$t0, u_table		# store returned u value
+	add	$t0, $t0, $s5
+	sw	$v1, ($t0)
+	la	$t0, v_table		# store returned v value
+	add	$t0, $t0, $s5
+	sw	$a0, ($t0)
+	
+	lw	$ra, 4($sp)		# restore stack
+	addi	$sp, $sp, 4
+	### advance pointer; end loop if we went through every value in the color table ###
+	addi	$s4, $s4, 4
+	beq	$s4, $s0, end_loop
+	
+	addi	$s5, $s5, 4		# increase offset and loop
+	j	convert_color_space_loop
+
+# ARGUMENTS: $a0 = data from entry in color table
+# RETURNS:   $v0 = y-value (Y component), $v1 = u-value (Cr component), $a0 = v-value (Cb component)
 transform_rgb_ybr:
 	addi	$sp, $sp, -4		# make space on the stack so we can call subroutines
 	sw	$ra, 4($sp)
@@ -115,27 +128,31 @@ transform_rgb_ybr:
 	mtc1	$t2, $f4		# convert B to fp
 	cvt.s.w	$f4, $f4
 	
-	### Y  = 16  + 0.256788*R + 0.504129*G + 0.097905*B ###
-	addi	$a0, $zero, 256788	# R coefficient, *10^6
-	addi	$a1, $zero, 504129	# G coefficient, *10^6
-	addi	$a2, $zero,  97905	# B coefficient, *10^6
-	addi	$a3, $zero,     16	# Constant to add
+	### Y  = 0  + 0.299*R + 0.587*G + 0.144*B ###
+	addi	$a0, $zero, 299		# R coefficient * 10^3
+	addi	$a1, $zero, 587		# G coefficient * 10^3
+	addi	$a2, $zero, 114		# B coefficient * 10^3
+	addi	$a3, $zero, 0		# Constant to add
 	jal	rgb_ybr_equ
-	add	$s7, $zero, $v0
-	### Cb = 128 - 0.148454*R - 0.290760*G + 0.439216*B ###
-	addi	$a0, $zero, -148454	# R coefficient, *10^6
-	addi	$a1, $zero, -290760	# G coefficient, *10^6
-	addi	$a2, $zero, 439216	# B coefficient, *10^6
-	addi	$a3, $zero,    128	# Constant to add
+	add	$t7, $zero, $v0
+	### Cb = 128 - 0.169*R - 0.331*G + 0.499*B ###
+	addi	$a0, $zero, -169	# R coefficient * 10^3
+	addi	$a1, $zero, -331	# G coefficient * 10^3
+	addi	$a2, $zero,  499	# B coefficient * 10^3
+	addi	$a3, $zero,  128	# Constant to add
 	jal	rgb_ybr_equ
 	add	$t8, $zero, $v0
 	### Cr = 128 + 0.439216*R - 0.368063*G - 0.071152*B ###
-	addi	$a0, $zero, 439216	# R coefficient, *10^6
-	addi	$a1, $zero, -368063	# G coefficient, *10^6
-	addi	$a2, $zero, -71152	# B coefficient, *10^6
-	addi	$a3, $zero,    128	# Constant to add
+	addi	$a0, $zero,  499	# R coefficient * 10^3
+	addi	$a1, $zero, -419	# G coefficient * 10^3
+	addi	$a2, $zero, -81		# B coefficient * 10^3
+	addi	$a3, $zero,  128	# Constant to add
 	jal	rgb_ybr_equ
 	add	$t9, $zero, $v0
+	
+	add	$v0, $zero, $t7
+	add	$v1, $zero, $t8
+	add	$a0, $zero, $t9
 	
 	lw	$ra, 4($sp)		# return stack to original state
 	addi	$sp, $sp, 4
@@ -147,7 +164,7 @@ rgb_ybr_equ:
 	addi	$sp, $sp, -4		# make space on the stack so we can call subroutines
 	sw	$ra, 4($sp)
 	
-	addi	$t0, $zero, 1000000	# store number to adjust coefficient
+	addi	$t0, $zero, 1000	# store number to adjust coefficient
 	mtc1	$t0, $f28
 	cvt.s.w	$f28, $f28
 	addi	$t0, $zero, 10		# store 0.5 in $f26 to aid in rounding
@@ -164,13 +181,13 @@ rgb_ybr_equ:
 	### Convert coefficients to decimal values ###
 	mtc1	$a0, $f6		# convert R coeff to fp
 	cvt.s.w	$f6, $f6		#     convert from word
-	div.s	$f6, $f6, $f28		#     divide by 10^6
+	div.s	$f6, $f6, $f28		#     divide by 10^3
 	mtc1	$a1, $f8		# convert G coeff to fp
 	cvt.s.w	$f8, $f8		#     convert from word
-	div.s	$f8, $f8, $f28		#     divide by 10^6
+	div.s	$f8, $f8, $f28		#     divide by 10^3
 	mtc1	$a2, $f10		# convert B coeff to fp
 	cvt.s.w	$f10, $f10		#     convert from word
-	div.s	$f10, $f10, $f28	#     divide by 10^6
+	div.s	$f10, $f10, $f28	#     divide by 10^3
 	
 	### Multiply by R, G, B values, add results ###
 	mul.s	$f6, $f6, $f0		# R' = R_coeff*R
@@ -178,7 +195,7 @@ rgb_ybr_equ:
 	mul.s	$f10, $f10, $f4		# B' = B_coeff*B
 	add.s	$f6, $f6, $f8		# =  R' + G'
 	add.s	$f6, $f6, $f10		# = (R' + G') + B'
-	add.s	$f6, $f6, $f12		# = (R' + B' + G') + constant
+	add.s	$f6, $f6, $f12		# = (R' + G' + B') + constant
 	
 	### Round to nearest int and return value ###
 	add.s	$f6, $f6, $f26
@@ -201,6 +218,9 @@ ppd_loop:
 	syscall
 	j	ppd_loop
 
+end_loop:
+	jr	$ra
+
 exit:
 	li	$v0, 10
 	syscall
@@ -209,4 +229,4 @@ printBreak:
 	li	$v0, 4
 	la	$a0, br
 	syscall
-	jr $ra
+	jr	$ra
