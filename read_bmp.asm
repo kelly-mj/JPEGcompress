@@ -2,11 +2,10 @@
 
 	.data
 buf:		.space	2	# space in mem so main contents of .bmp file are word-aligned
-buffer:		.space	2000	# reserve space to store contents of .bmp file
-buf2:		.space	2
+buffer:		.space	2002	# reserve space to store contents of .bmp file
 y_table:	.space	64	# reserve space to store YCbCr color space data
-u_table:	.space	64
-v_table:	.space	64
+cb_table:	.space	64
+cr_table:	.space	64
 fin:		.asciiz	"test_8x8_16-color_wb.bmp"
 fout:		.asciiz "testout.bmp"
 br:		.asciiz "\n"
@@ -15,14 +14,12 @@ br:		.asciiz "\n"
 main:
 	jal	read_bmp		# read bitmap image, get width and height
 	jal	convert_color_space	# convert RGB color space to YCbCr
-	#jal	print_pixel_data
 	j	exit
 
 ## VALUES USED ##
 # $s0	address of the start of the actual image data (pixel data)
 # $s1	bitmap image horizontal width
 # $s2	bitmap image vertical height
-# $s3	bits per pixel - "1" indicates monochrome image <-- MIGHT JUST WANT TO ASSUME 16-BIT
 
 # ARGUMENTS: $a0 = name of file
 #            $a1 = compression ratio
@@ -57,7 +54,7 @@ read_bmp:
 	addi	$s0, $s0, 4	# address of start of pixel data - corrected
 	lw	$s1, 4($t1)	# store width  (4 bytes into the info header)
 	lw	$s2, 8($t1)	# store height (8 bytes into the info header)
-	lh	$s3, 14($t1)	# store bits per pixel
+	#lh	$s3, 14($t1)	# store bits per pixel
 	
 	jr $ra			# return to main program
 
@@ -65,7 +62,7 @@ read_bmp:
 # RETURNS:   none
 # USES:      $s4, $s5, $s6
 convert_color_space:
-	addi	$sp, $sp, -12		# make space on the stack so we can call subroutines
+	addi	$sp, $sp, -12		# make space on the stack
 	sw	$ra, 4($sp)
 	sw	$s4, 8($sp)
 	sw	$s5, 12($sp)
@@ -73,7 +70,7 @@ convert_color_space:
 	addi	$s4, $s0, -64		# store start of color table in $s4
 	addi	$s5, $s5, 0		# offset
 	
-	### loop through each entry in color table and convert RGB -> YCbCr (YUV) ###
+	### loop through each entry in color table and convert RGB -> YCbCr ###
 	jal	convert_color_space_loop
 
 	lw	$s5, 12($sp)		# return stack to original state
@@ -95,10 +92,10 @@ convert_color_space_loop:
 	la	$t0, y_table		# store returned y value
 	add	$t0, $t0, $s5
 	sw	$v0, ($t0)
-	la	$t0, u_table		# store returned u value
+	la	$t0, cb_table		# store returned u value
 	add	$t0, $t0, $s5
 	sw	$v1, ($t0)
-	la	$t0, v_table		# store returned v value
+	la	$t0, cr_table		# store returned v value
 	add	$t0, $t0, $s5
 	sw	$a0, ($t0)
 	
@@ -110,6 +107,7 @@ convert_color_space_loop:
 	
 	addi	$s5, $s5, 4		# increase offset and loop
 	j	convert_color_space_loop
+
 
 # ARGUMENTS: $a0 = data from entry in color table
 # RETURNS:   $v0 = y-value (Y component), $v1 = u-value (Cr component), $a0 = v-value (Cb component)
@@ -142,7 +140,7 @@ transform_rgb_ybr:
 	addi	$a3, $zero,  128	# Constant to add
 	jal	rgb_ybr_equ
 	add	$t8, $zero, $v0
-	### Cr = 128 + 0.439216*R - 0.368063*G - 0.071152*B ###
+	### Cr = 128 + 0.499*R - 0.419*G - 0.081*B ###
 	addi	$a0, $zero,  499	# R coefficient * 10^3
 	addi	$a1, $zero, -419	# G coefficient * 10^3
 	addi	$a2, $zero, -81		# B coefficient * 10^3
@@ -157,6 +155,7 @@ transform_rgb_ybr:
 	lw	$ra, 4($sp)		# return stack to original state
 	addi	$sp, $sp, 4
 	jr $ra				# return to caller
+
 
 # ARGUMENTS: $a0=R_coeff, $a1=G_coeff, $a2=B_coeff, $a3=constant, $f0=R_value, $f2=G_value, $f4=B_value
 # RETURNS  : $v0 = equation result rounded to the nearest integer
@@ -205,18 +204,6 @@ rgb_ybr_equ:
 	lw	$ra, 4($sp)		# restore stack
 	addi	$sp, $sp, 4
 	jr	$ra			# return to caller
-			
-print_pixel_data:
-	subi	$t0, $s0, 4
-	j	ppd_loop
-	
-ppd_loop:
-	addi	$t0, $t0, 4
-	lw	$t1, ($t0)
-	la	$a0, ($t1)
-	li	$v0, 34
-	syscall
-	j	ppd_loop
 
 end_loop:
 	jr	$ra
