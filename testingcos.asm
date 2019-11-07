@@ -1,10 +1,14 @@
 .data
     prompt: .asciiz "Input an integer x:\n"
     one: .double 1
+    pi: .double 3.141592
+    
 .text
 main:
 	la $t8, one
 	l.d $f8, 0($t8)
+	la $t9, pi
+	l.d $f22, 0($t9)
     
     # show prompt
     li        $v0, 4
@@ -14,6 +18,9 @@ main:
     # read x
     li        $v0, 7 #double is stored in $f0
     syscall
+    
+    jal modulo
+    
     # function call
     jal      exponents       # jump factorial and save position to $ra
     
@@ -70,14 +77,20 @@ main:
 .text
 exponents:
 	#squares the input
-	mul.d $f2 $f0, $f0
-	
+	mul.d $f2, $f0, $f0   
+
 	#power to the fourth
 	mul.d $f4, $f2, $f2
-
-	 #power to the sixth
-	mul.d $f6, $f4, $f4
 	
+	 #power to the sixth
+	mul.d $f6, $f4, $f2
+
+	jr $ra
+	
+modulo:
+	sub.d $f0, $f0, $f22
+	c.lt.d  $f22, $f0
+	bc1t modulo
 	jr $ra
 
 factorial:
