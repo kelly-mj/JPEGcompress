@@ -1,7 +1,8 @@
 .data
     prompt: .asciiz "Input an integer x:\n"
     one: .double 1
-    pi: .double 3.141592
+    negative: .double -1
+    pi: .double 3.141593
     
 .text
 main:
@@ -9,7 +10,9 @@ main:
 	l.d $f8, 0($t8)
 	la $t9, pi
 	l.d $f22, 0($t9)
-    
+	la $t6, negative
+	l.d $f20, 0($t6)
+	
     # show prompt
     li        $v0, 4
     la        $a0, prompt
@@ -19,6 +22,7 @@ main:
     li        $v0, 7 #double is stored in $f0
     syscall
     
+    addi $t4, $zero, 0
     jal modulo
     
     # function call
@@ -65,6 +69,11 @@ main:
     
     sub.d $f8, $f8, $f6
     
+    andi $t5, $t4, 1
+    beqz $t5, normal
+    mul.d $f8, $f8, $f20
+    
+normal:
     # print the result
     li        $v0, 3      # system call #1 - print int
     mov.d $f12, $f8
@@ -82,12 +91,13 @@ exponents:
 	#power to the fourth
 	mul.d $f4, $f2, $f2
 	
-	 #power to the sixth
+	#power to the sixth
 	mul.d $f6, $f4, $f2
 
 	jr $ra
 	
 modulo:
+	addi $t4, $t4, 1
 	sub.d $f0, $f0, $f22
 	c.lt.d  $f22, $f0
 	bc1t modulo
