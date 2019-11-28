@@ -2,28 +2,34 @@
 
 .globl	convert_color_space
 
-# ARGUMENTS: $a0 = address of y_table
+# ARGUMENTS: $a0 = address of y_table, $a1 = address of y_pixel data
 # RETURNS:   none
 # USES:      $s4, $s5, $s6
 convert_color_space:
-	addi	$sp, $sp, -16		# make space on the stack
+	addi	$sp, $sp, -20		# make space on the stack
 	sw	$ra, 4($sp)
 	sw	$s4, 8($sp)
 	sw	$s5, 12($sp)
 	sw	$s6, 16($sp)
+	sw	$s7, 20($sp)
 
 	addi	$s4, $s0, -64		# store start of color table in $s4
 	addi	$s5, $s5, 0		# offset
 	add	$s6, $zero, $a0		# address of Y table
+	add	$s7, $zero, $a1		# address of Y pixel data
 	
 	### loop through each entry in color table and convert RGB -> YCbCr ###
 	jal	convert_color_space_loop
+	
+	### use the YCbCr data to store values for each pixel ###
+	jal	get_ycbcr_pixel_data
 
-	lw	$s6, 16($sp)		# return stack to original state
+	lw	$s7, 20($sp)		# return stack to original state
+	lw	$s6, 16($sp)
 	lw	$s5, 12($sp)
 	lw	$s6, 8($sp)
 	lw	$ra, 4($sp)
-	addi	$sp, $sp, 16
+	addi	$sp, $sp, 20
 	jr	$ra
 
 # ARGUMENTS: $s4 = address of next entry in color table, $s5 = offset
@@ -150,3 +156,115 @@ rgb_ybr_equ:
 	lw	$ra, 4($sp)		# restore stack
 	addi	$sp, $sp, 4
 	jr	$ra			# return to caller
+	
+	
+get_ycbcr_pixel_data:
+	addi	$sp, $sp, -4		# make space on the stack so we can call subroutines
+	sw	$ra, 4($sp)
+	
+	add	$a0, $s7, $zero		# y pixel data buffer
+	add	$a1, $s6, $zero		# address of y color table
+	jal	pixel
+	
+	lw	$ra, 4($sp)		# restore stack
+	addi	$sp, $sp, 4
+	jr $ra
+
+pixel:
+	addi	$sp, $sp, -12		# make space on the stack so we can call subroutines
+	sw	$ra, 4($sp)
+	sw	$s1, 8($sp)
+	sw	$s2, 12($sp)
+	
+	add	$s1, $zero, $zero
+	addi	$s2, $zero, 8
+	jal pixel_row_loop
+	
+	lw	$s2, 12($sp)
+	lw	$s1, 8($sp)
+	lw	$ra, 4($sp)		# restore stack
+	addi	$sp, $sp, 12
+	jr $ra
+	
+pixel_row_loop:
+	addi	$sp, $sp, -4		# make space on the stack so we can call subroutines
+	sw	$ra, 4($sp)
+	
+	jal	pixel_row		# process next row of pixel data
+	addi	$s1, $s1, 1		# increment counter
+	
+	lw	$ra, 4($sp)		# restore stack
+	addi	$sp, $sp, 4
+	
+	beq	$s1, $s2, end_loop	# end loop after 8 iterations
+	j	pixel_row_loop
+	
+pixel_row:
+	addi	$sp, $sp, -4		# make space on the stack so we can call subroutines
+	sw	$ra, 4($sp)
+	
+	### get row offset (row number * 4) ###
+	# each row is one word in memory (32 bits, 4 bits per pixel)
+	addi	$t8, $zero, 4
+	mult	$t8, $s1
+	mflo	$t3
+	
+	### get pixel row ###
+	add	$t0, $s0, $t3		# now holds starting address of row we're pointing to
+	lw	$t9, ($t0)		# $t9 now holds data from the row we're pointing to
+	
+	### set loop counter, row offset and loop through each pixel in the row ###
+	addi	$t4, $zero, 8		# loop counter (loops through pixels 7-0)
+	addi	$t5, $zero, 32		# get row offset in pixel data
+	mult	$t5, $s1
+	mflo	$t5
+	jal	pixel_loop
+
+	lw	$ra, 4($sp)		# restore stack
+	addi	$sp, $sp, 4
+	
+	jr	$ra
+	
+pixel_loop:
+	addi	$sp, $sp, -4		# make space on the stack so we can call subroutines
+	sw	$ra, 4($sp)
+	
+	addi	$t4, $t4, -1		# decrement the counter
+	andi	$a0, $t9, 15		# get the value in position 0x-------x in the pixel row data
+	srl	$t9, $t9, 4		# shift that number out of the pixel data; place next  number in lowest position
+	add	$a1, $zero, $t4		# number of pixel we're dealing with
+	jal	pixel_process
+	
+	lw	$ra, 4($sp)		# restore stack
+	addi	$sp, $sp, 4
+	
+	beqz	$t4, end_loop		# end loop when counter reaches 0
+	j	pixel_loop		# otherwise, loop
+	
+	
+pixel_process:
+	mult	$a0, $t8		# use to calculate offset in color table (multiply by 4 because table is word-aligned)
+	mflo	$a0			
+	mult	$a1, $t8		# pixel number offset
+	mflo	$a1
+	
+	add	$t2, $a0, $s6		# add offset to beginning address of Y table
+	lw	$t0, ($t2)		# get data from Y table
+	addi	$t0, $t0, -128		# shift range
+	add	$t1, $s7, $t5		# add row offset to beginning of Y pixel data
+	add	$t1, $t1, $a1		# add pixel number offset to Y pixel data pointer
+	sw	$t0, ($t1)		# store pixel data
+	
+	addi	$t2, $t2, 256		# get beginning address + offset of Cb table
+	lw	$t0, ($t2)		# get data from Cb table
+	addi	$t0, $t0, -128		# shift range
+	addi	$t1, $t1, 256		# get beginning address + offset of Cb pixel data
+	sw	$t0, ($t1)		# store pixel data
+	
+	addi	$t2, $t2, 256		# get beginning address + offset of Cb table
+	lw	$t0, ($t2)		# get data from Cb table
+	addi	$t0, $t0, -128		# shift range
+	addi	$t1, $t1, 256		# get beginning address + offset of Cb pixel data
+	sw	$t0, ($t1)		# store pixel data
+	
+	jr	$ra
