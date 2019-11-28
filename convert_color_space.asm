@@ -177,8 +177,8 @@ pixel:
 	sw	$s2, 12($sp)
 	
 	add	$s1, $zero, $zero
-	addi	$s2, $zero, 1
-	jal pixel_loop
+	addi	$s2, $zero, 8
+	jal pixel_row_loop
 	
 	lw	$s2, 12($sp)
 	lw	$s1, 8($sp)
@@ -186,7 +186,7 @@ pixel:
 	addi	$sp, $sp, 12
 	jr $ra
 	
-pixel_loop:
+pixel_row_loop:
 	addi	$sp, $sp, -4		# make space on the stack so we can call subroutines
 	sw	$ra, 4($sp)
 	
@@ -197,54 +197,62 @@ pixel_loop:
 	addi	$sp, $sp, 4
 	
 	beq	$s1, $s2, end_loop	# end loop after 8 iterations
+	j	pixel_row_loop
 	
 pixel_row:
 	addi	$sp, $sp, -4		# make space on the stack so we can call subroutines
 	sw	$ra, 4($sp)
 	
 	### get row offset (row number * 4) ###
-	#   each row is one word in memory (32 bits, 4 bits per pixel)  #
+	# each row is one word in memory (32 bits, 4 bits per pixel)
 	addi	$t8, $zero, 4
 	mult	$t8, $s1
-	mflo	$t1
+	mflo	$t3
 	
 	### get pixel row ###
-	add	$t0, $s0, $t1		# now holds starting address of row we're pointing to
+	add	$t0, $s0, $t3		# now holds starting address of row we're pointing to
 	lw	$t9, ($t0)		# $t9 now holds data from the row we're pointing to
 	
-	# pixel 0
-	andi	$a0, $t9, 15		# get data from position 0x--------x in the row
-	jal	pixel_process
-	
-	#andi	$t0, $t9, 15		# get data from position 0x--------x in the row
-	#mult	$t0, $t8		# use to calculate offset in color table (multiply by 4 because table is word-aligned)
-	#mflo	$t0			
-	#add	$t0, $t0, $s6		# add offset to beginning address of Y table
-	#lw	$t0, ($t0)		# get data from Y table
-	#add	$t1, $s7, $t1		# add pixel position offset to beginning of Y table
-	#sw	$t0, ($t1)		# store pixel data
-	
-	# pixel 1
-	# pixel 2
-	# pixel 3
-	# pixel 4
-	# pixel 5
-	# pixel 6
-	# pixel 7
-	
+	### set loop counter, row offset and loop through each pixel in the row ###
+	addi	$t4, $zero, 8		# loop counter (loops through pixels 7-0)
+	addi	$t5, $zero, 32		# get row offset in pixel data
+	mult	$t5, $s1
+	mflo	$t5
+	jal	pixel_loop
+
 	lw	$ra, 4($sp)		# restore stack
 	addi	$sp, $sp, 4
 	
 	jr	$ra
 	
+pixel_loop:
+	addi	$sp, $sp, -4		# make space on the stack so we can call subroutines
+	sw	$ra, 4($sp)
+	
+	addi	$t4, $t4, -1		# decrement the counter
+	andi	$a0, $t9, 15		# get the value in position 0x-------x in the pixel row data
+	srl	$t9, $t9, 4		# shift that number out of the pixel data; place next  number in lowest position
+	add	$a1, $zero, $t4		# number of pixel we're dealing with
+	jal	pixel_process
+	
+	lw	$ra, 4($sp)		# restore stack
+	addi	$sp, $sp, 4
+	
+	beqz	$t4, end_loop		# end loop when counter reaches 0
+	j	pixel_loop		# otherwise, loop
+	
+	
 pixel_process:
 	mult	$a0, $t8		# use to calculate offset in color table (multiply by 4 because table is word-aligned)
 	mflo	$a0			
+	mult	$a1, $t8		# pixel number offset
+	mflo	$a1
 	
 	add	$t2, $a0, $s6		# add offset to beginning address of Y table
 	lw	$t0, ($t2)		# get data from Y table
 	addi	$t0, $t0, -128		# shift range
-	add	$t1, $s7, $t1		# add pixel position offset to beginning of Y pixel data
+	add	$t1, $s7, $t5		# add row offset to beginning of Y pixel data
+	add	$t1, $t1, $a1		# add pixel number offset to Y pixel data pointer
 	sw	$t0, ($t1)		# store pixel data
 	
 	addi	$t2, $t2, 256		# get beginning address + offset of Cb table
