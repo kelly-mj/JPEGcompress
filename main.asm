@@ -151,13 +151,23 @@ main:
 	jal	read_bmp		# read bitmap image, get width and height
 	
 	# DONE: store color table data in y_table, cb_table, cr_table color spaces
+	# convert RGB color space to YCbCr; store YCbCr data in the reserved "pixel" spaces in .data segment
 	la	$a0, y_table
 	la	$a1, y_pixel
-	jal	convert_color_space	# convert RGB color space to YCbCr
+	jal	convert_color_space
 	
 	# TODO: Implement DCT transformation
-	# TODO: Implement matrix quantization
+	
+	
+	# DONE: Implement matrix quantization
+	la	$a0, wip_pixel		# load address of beginning of pixel block we wish to manipulate (manipulated data will overwrite existing data in this block)
+	la	$a1, quant_l		# load address of beginning of quantization table (quant_l for manipulating Y (luminance data); quant_c for Cb, Cr (chrominance data))
+	jal	quantize
+	
 	# TODO: Implement run-length encoding
+	
+	
 	# TODO: Implement entropy encoding
+	
 
 	j	exit

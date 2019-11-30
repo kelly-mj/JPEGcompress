@@ -15,8 +15,7 @@ quantize:
 	
 	add	$s1, $zero, $a0		# save address of beginning of pixel data
 	add	$s2, $zero, $a1		# save address of beginning of quantization table
-	#add	$t8, $zero, $zero	# set counter variable for pixel data; need to load 64 words from memory. Increments by 4.
-	add	$t9, $zero, $zero	# set counter variable for quantization table; need to load 16 words from memory to retrieve quantization table
+	add	$t9, $zero, $zero	# variable to store word offset from beginning of quantization table
 	jal	q_loop
 	
 	lw	$s3, 16($sp)		# restore the stack
@@ -41,14 +40,11 @@ q_loop:
 	addi	$sp, $sp, 4
 	
 	addi	$t9, $t9, 4		# add offset to point to next word in quantization table
-	addi	$t0, $zero, 64
-	beq	$t0, $t9, end_loop	# check whether the quantization pointer = 16
+	addi	$t0, $zero, 64		# store a comparison number (64) in a register
+	beq	$t0, $t9, end_loop	# check whether the quantization offset = 64
 	j	q_loop
 	
 q_inner_loop:
-	#addi	$sp, $sp, -4		# make space on the stack
-	#sw	$ra, 4($sp)
-	
 	###  get next lower bits of entry from quantization table  ###
 	andi	$t1, $s3, 255		# store lower bits in $t1
 	srl	$s3, $s3, 8		# shift unneeded bits out of the data entry
