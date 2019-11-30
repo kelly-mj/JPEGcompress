@@ -4,6 +4,8 @@
 
 # ARGUMENTS: $a0 = address of beginning of pixel data block we're manipulating
 #	     $a1 = address of beginning of quantization table
+# RETURNS:   nothing
+# MODIFIES:  data in the pixel data block passed in from $a0
 quantize:
 # loop backwards through ecah word from quantization table
 # order: 0x000000xx, 0x0000xx00, 0x00xx0000, 0xxx000000
