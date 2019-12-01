@@ -157,12 +157,22 @@ main:
 	jal	convert_color_space
 	
 	# TODO: Implement DCT transformation
-	
+	### FOR TESTING PURPOSES: I have copied the y_pixel data into the wip_pixel data block. ###
+	la	$a0, y_pixel
+	la	$a1, wip_pixel
+	la	$a2, 64
+	jal	copy
 	
 	# DONE: Implement matrix quantization
 	la	$a0, wip_pixel		# load address of beginning of pixel block we wish to manipulate (manipulated data will overwrite existing data in this block)
 	la	$a1, quant_l		# load address of beginning of quantization table (quant_l for manipulating Y (luminance data); quant_c for Cb, Cr (chrominance data))
 	jal	quantize
+	
+	# DONE: Implement zig-zag scan; leave re-ordered data in wip_pixel
+	la	$a0, wip_pixel
+	la	$a1, buffer
+	addi	$a1, $a1, 2		# align copy data location on word boundary (buffer is 2 bytes off)
+	jal	zigzag
 	
 	# TODO: Implement run-length encoding
 	
