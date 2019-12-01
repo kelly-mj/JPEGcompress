@@ -1,24 +1,26 @@
 	.data
 	
 	blank: .asciiz " "
-	string: .asciiz "WWWWWWWWWWWWBWWWWWWWWWWWWBBBWWWWWWWWWWWWWWWWWWWWWWWWBWWWWWWWWWWWWWW"
+	Numberstring: .asciiz "558999999303030222222222222"
+	BWString: .asciiz "WWWWWWWWWWWWBWWWWWWWWWWWWBBBWWWWWWWWWWWWWWWWWWWWWWWWBWWWWWWWWWWWWWW"
+	
 
 	.text
 main:   
-	la $s0, string     
+	la $s0, BWString #load the string that you want to  use
 	            
-	add $s1, $s0, 0 
-	lb $s2, 0($s1)
-	move $t3, $s2
-	li $t0, 0
-	li $t4, 0 #counter
+	add $s1, $s0, 0 #sets the  pointer to the frst space
+	lb $s2, 0($s1) #this gets the first letter and sets it as the value
+	move $t3, $s2	#$t3 is  the one you are comparing it with
+	li $t0, 0 #pointer for the string
+	li $t4, 0 #counter for the lettters
 
 counting:
-	beq $s2, $zero, exit
-	add $s1, $s0, $t0   
+	beq $s2, $zero, exit #reaches end  of string
+	add $s1, $s0, $t0   #moves the pointer along the string
 	lb $s2, 0($s1)      #Loading char to shift into $s2
 	addi $t0, $t0, 1    #i++
-	addi $t4, $t4, 1
+	addi $t4, $t4, 1 #counter for the letter++
 	bne $t3, $s2, reset
 	move $t3, $s2
 
