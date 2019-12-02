@@ -1,6 +1,6 @@
   .data
 
-# load 6 words into memory. Start at the address identified as numarray and print all 8 of the numbers out
+# load 8 words into memory. Start at the address identified as numarray and print all 8 of the numbers out
 
 numarray: .word 0
 .word 1
