@@ -15,8 +15,8 @@ numarray: .word 0
 .text
 
 main:
-  la  $s0, numarray
-  addi  $t0, $zero, 8
+  la  $s0, numarray   # starting location of data in memory
+  addi  $t0, $zero, 8 # counter
   jal print_loop
   
   li  $v0, 10
@@ -28,4 +28,10 @@ print:
   syscall
 
   addi  $s0, $s0, 4
+  addi  $t0, $t0, -1
+  beqz  $t0, end_loop
+  
   j print
+
+end_loop:
+  jr  $ra
